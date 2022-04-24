@@ -3,7 +3,8 @@ __all__ = [
     'CacheFileHandler',
     'DjangoSessionCacheHandler',
     'MemoryCacheHandler',
-    'RedisCacheHandler']
+    'RedisCacheHandler',
+    'SQLiteCacheHandler']
 
 import errno
 import json
