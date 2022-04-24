@@ -10,7 +10,6 @@ import json
 import logging
 import os
 import sqlite3
-from typing import final
 from spotipy.util import CLIENT_CREDS_ENV_VARS
 
 from redis import RedisError
@@ -186,8 +185,8 @@ class RedisCacheHandler(CacheHandler):
 
 class SQLiteCacheHandler(CacheHandler):
     """
-    A cache handler that stores the token info as json in a table `token_info` of a SQLite database.
-    Uses the Python built-in `sqlite3`.
+    A cache handler that stores the token info as json in a table `token_info`
+    of a SQLite database. Uses the Python built-in `sqlite3`.
     """
 
     def __init__(self, db_path="cache.db", username=None):
@@ -200,7 +199,8 @@ class SQLiteCacheHandler(CacheHandler):
                          enabling mulitple authenticated users).
         """
         self.db_path = db_path
-        self.username = username or os.getenv(CLIENT_CREDS_ENV_VARS["client_username"], "token_info")
+        self.username = username or os.getenv(
+            CLIENT_CREDS_ENV_VARS["client_username"], "token_info")
 
         con = sqlite3.connect(self.db_path)
         con.execute(
@@ -229,7 +229,10 @@ class SQLiteCacheHandler(CacheHandler):
         token_info_json = json.dumps(token_info)
         try:
             con.execute(
-                "INSERT INTO token_info VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (
+                    "INSERT INTO token_info VALUES (?, ?) ON CONFLICT(key) "
+                    "DO UPDATE SET value=excluded.value"
+                ),
                 (self.username, token_info_json),
             )
             con.commit()
