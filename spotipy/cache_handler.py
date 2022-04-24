@@ -9,9 +9,12 @@ import errno
 import json
 import logging
 import os
+import sqlite3
+from typing import final
 from spotipy.util import CLIENT_CREDS_ENV_VARS
 
 from redis import RedisError
+
 
 logger = logging.getLogger(__name__)
 
@@ -179,3 +182,58 @@ class RedisCacheHandler(CacheHandler):
             self.redis.set(self.key, json.dumps(token_info))
         except RedisError as e:
             logger.warning('Error saving token to cache: ' + str(e))
+
+
+class SQLiteCacheHandler(CacheHandler):
+    """
+    A cache handler that stores the token info as json in a table `token_info` of a SQLite database.
+    Uses the Python built-in `sqlite3`.
+    """
+
+    def __init__(self, db_path="cache.db", username=None):
+        """
+        Parameters:
+             * db_path: May be supplied. Defaults to `cache.db`. Will be created
+                        if it doesn't exist.
+             * username: Unique ID for a specific user. May be supplied or set as
+                         environment variable. (Used as the key for the entry,
+                         enabling mulitple authenticated users).
+        """
+        self.db_path = db_path
+        self.username = username or os.getenv(CLIENT_CREDS_ENV_VARS["client_username"], "token_info")
+
+        con = sqlite3.connect(self.db_path)
+        con.execute(
+            "CREATE TABLE IF NOT EXISTS token_info (key TEXT PRIMARY KEY, value TEXT);"
+        )
+        con.close()
+
+    def get_cached_token(self):
+        token_info = None
+        try:
+            con = sqlite3.connect(self.db_path)
+            token_info_json = con.execute(
+                "SELECT value FROM token_info WHERE key=?", (self.username,)
+            ).fetchone()
+            if token_info_json:
+                return json.loads(token_info_json[0])
+        except sqlite3.Error as error:
+            logger.warning('Error getting token from cache: ', error.args[0])
+        finally:
+            con.close()
+
+        return token_info
+
+    def save_token_to_cache(self, token_info):
+        con = sqlite3.connect(self.db_path)
+        token_info_json = json.dumps(token_info)
+        try:
+            con.execute(
+                "INSERT INTO token_info VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (self.username, token_info_json),
+            )
+            con.commit()
+        except sqlite3.Error as error:
+            logger.warning('Error saving token to cache: ', error.args[0])
+        finally:
+            con.close()
