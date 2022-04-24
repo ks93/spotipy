@@ -10,10 +10,10 @@ import json
 import logging
 import os
 import sqlite3
-from spotipy.util import CLIENT_CREDS_ENV_VARS
 
 from redis import RedisError
 
+from spotipy.util import CLIENT_CREDS_ENV_VARS
 
 logger = logging.getLogger(__name__)
 
@@ -229,12 +229,15 @@ class SQLiteCacheHandler(CacheHandler):
         token_info_json = json.dumps(token_info)
         try:
             con.execute(
-                (
-                    "INSERT INTO token_info VALUES (?, ?) ON CONFLICT(key) "
-                    "DO UPDATE SET value=excluded.value"
-                ),
+                "INSERT OR REPLACE INTO token_info VALUES (?, ?)",
                 (self.username, token_info_json),
             )
+            # SQLite version >= 3.24.0 supports upsert, so one would do:
+            # (
+            #   "INSERT INTO token_info VALUES (?, ?) ON CONFLICT(key) "
+            #   "DO UPDATE SET value=excluded.value"
+            # )
+            # however, Colab and the likes doesn't use it yet :(
             con.commit()
         except sqlite3.Error as error:
             logger.warning('Error saving token to cache: ', error.args[0])
